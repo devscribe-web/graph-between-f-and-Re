@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friction Factor and Reynolds Number Table</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #0077b6;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 10px solid #FC74FD;
+            border-radius: 8px;
+        }
+
+        th, td {
+            border: 1px solid #C8509B;
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #C8509B;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        td {
+            background-color: #FC74FD;
+            color: #333;
+        }
+
+        input[type="number"] {
+            width: 90%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            display: block;
+            margin: 20px auto;
+            background-color: #C8509B;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #FC74FD;
+            transform: scale(1.05);
+        }
+
+        canvas {
+            margin: 30px auto;
+            display: block;
+            max-width: 800px;
+            border: 2px solid #C8509B;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Measurement Table</h2>
+    <button onclick="addRow()">Add Row</button>
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>h1 (cm)</th>
+                <th>h2 (cm)</th>
+                <th>Time (t sec)</th>
+                <th>Discharge (Q)</th>
+                <th>P1 (cm)</th>
+                <th>P2 (cm)</th>
+                <th>Length (L)</th>
+                <th>Diameter (d)</th>
+                <th>Friction Factor (f)</th>
+                <th>Kinematic Viscosity (v)</th>
+                <th>Reynolds Number (Re)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Rows will be dynamically added here -->
+        </tbody>
+    </table>
+
+    <canvas id="frictionChart"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let chart; // Global chart variable
+        let frictionData = [];
+        let reynoldsData = [];
+
+        function addRow() {
+            const table = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
+            const row = table.insertRow();
+
+            // Insert cells for inputs and outputs
+            row.insertCell(0).innerHTML = `<input type="number" step="any" class="h1">`;
+            row.insertCell(1).innerHTML = `<input type="number" step="any" class="h2">`;
+            row.insertCell(2).innerHTML = `<input type="number" step="any" class="time">`;
+            row.insertCell(3).innerText = "-"; // Discharge (Q)
+            row.insertCell(4).innerHTML = `<input type="number" step="any" class="p1">`;
+            row.insertCell(5).innerHTML = `<input type="number" step="any" class="p2">`;
+            row.insertCell(6).innerHTML = `<input type="number" step="any" class="length">`;
+            row.insertCell(7).innerHTML = `<input type="number" step="any" class="diameter">`;
+            row.insertCell(8).innerText = "-"; // Friction Factor (f)
+            row.insertCell(9).innerHTML = `<input type="number" step="any" class="viscosity">`;
+            row.insertCell(10).innerText = "-"; // Reynolds Number (Re)
+
+            // Add event listener for input changes
+            const inputs = row.querySelectorAll('input');
+            inputs.forEach(input => input.addEventListener('input', () => calculateRow(row)));
+        }
+
+        function calculateRow(row) {
+            const h1 = parseFloat(row.querySelector('.h1').value) || 0;
+            const h2 = parseFloat(row.querySelector('.h2').value) || 0;
+            const time = parseFloat(row.querySelector('.time').value) || 0;
+            const p1 = parseFloat(row.querySelector('.p1').value) || 0;
+            const p2 = parseFloat(row.querySelector('.p2').value) || 0;
+            const length = parseFloat(row.querySelector('.length').value) || 0;
+            const diameter = parseFloat(row.querySelector('.diameter').value) || 0;
+            const viscosity = parseFloat(row.querySelector('.viscosity').value) || 0;
+
+            let Q = 0, f = 0, Re = 0;
+            if (time > 0) {
+                Q = (900 * (h2 - h1)) / time; // Discharge
+            }
+
+            if (Q > 0 && length > 0 && diameter > 0) {
+                f = (12 * 12.6 * (p1 - p2) * Math.pow(diameter, 5)) / (length * Math.pow(Q, 2)); // Friction Factor
+            }
+
+            if (Q > 0 && diameter > 0 && viscosity > 0) {
+                Re = (4 * Q) / (Math.PI * Math.pow(diameter, 5) * viscosity); // Reynolds Number
+            }
+
+            row.cells[3].innerText = Q.toFixed(4); // Update Discharge
+            row.cells[8].innerText = f.toFixed(4); // Update Friction Factor
+            row.cells[10].innerText = Re.toFixed(4); // Update Reynolds Number
+
+            updateGraph(f, Re);
+        }
+
+        function updateGraph(frictionFactor, reynoldsNumber) {
+            if (frictionFactor > 0 && reynoldsNumber > 0) {
+                frictionData.push(frictionFactor);
+                reynoldsData.push(reynoldsNumber);
+
+                drawChart();
+            }
+        }
+
+        function drawChart() {
+            const ctx = document.getElementById('frictionChart').getContext('2d');
+
+            if (chart) chart.destroy(); // Destroy previous chart
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: reynoldsData,
+                    datasets: [{
+                        label: 'Friction Factor vs Reynolds Number',
+                        data: frictionData,
+                        borderColor: '#C8509B',
+                        backgroundColor: 'rgba(200, 80, 155, 0.2)',
+                        borderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Reynolds Number (Re)' } },
+                        y: { title: { display: true, text: 'Friction Factor (f)' } }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
